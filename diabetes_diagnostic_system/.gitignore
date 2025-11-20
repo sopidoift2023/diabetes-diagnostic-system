@@ -1,0 +1,26 @@
+# Django
+*.pyc
+*~
+__pycache__/
+*.sqlite3
+*.log
+.env
+.env.local
+
+# ML models (optional - you might want to exclude large files)
+*.pkl
+*.joblib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual environment
+venv/
+env/

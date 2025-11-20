@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diabetes Assessment - Diabetes Diagnostic System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .assessment-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+        }
+        .form-card {
+            border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 15px;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #333;
+        }
+        .btn-assessment {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+        }
+        .info-tooltip {
+            cursor: pointer;
+            color: #667eea;
+        }
+        .unit-toggle {
+            font-size: 0.85rem;
+            color: #667eea;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.85) !important;
+            padding: 0.5rem 1rem;
+        }
+        .navbar-nav .nav-link:hover {
+            color: white !important;
+        }
+        .navbar-text {
+            color: rgba(255, 255, 255, 0.85);
+        }
+        .logout-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.85) !important;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+        }
+        .logout-btn:hover {
+            color: white !important;
+        }
+        .login-prompt {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'index' %}">
+                <i class="fas fa-heartbeat me-2"></i>
+                DiabetesDiagnostic
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                    <span class="navbar-text me-3">
+                        <i class="fas fa-user me-1"></i>Welcome, {{ user.username }}
+                    </span>
+                    <a class="nav-link" href="{% url 'index' %}">
+                        <i class="fas fa-home me-1"></i>Home
+                    </a>
+                    <a class="nav-link" href="{% url 'history' %}">
+                        <i class="fas fa-history me-1"></i>My History
+                    </a>
+                    <!-- Fixed Logout Form -->
+                    <form action="{% url 'logout' %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="logout-btn nav-link">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                        </button>
+                    </form>
+                    {% else %}
+                    <a class="nav-link" href="{% url 'login' %}">
+                        <i class="fas fa-sign-in-alt me-1"></i>Login
+                    </a>
+                    <a class="nav-link" href="{% url 'register' %}">
+                        <i class="fas fa-user-plus me-1"></i>Register
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <div class="assessment-header text-center">
+        <div class="container">
+            <h1 class="display-5 fw-bold">Diabetes Risk Assessment</h1>
+            <p class="lead">Complete this form to get your personalized diabetes risk assessment</p>
+        </div>
+    </div>
+
+    <!-- Assessment Form -->
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <!-- Login Prompt for Non-Authenticated Users -->
+                {% if not user.is_authenticated %}
+                <div class="card form-card mb-4">
+                    <div class="card-body p-4">
+                        <div class="login-prompt">
+                            <h4><i class="fas fa-exclamation-circle text-primary me-2"></i>Account Required</h4>
+                            <p>You need to be logged in to use our diabetes assessment tool. Creating an account allows us to:</p>
+                            <ul>
+                                <li>Save your assessment results for future reference</li>
+                                <li>Track your health metrics over time</li>
+                                <li>Provide personalized recommendations</li>
+                                <li>Maintain the privacy and security of your health data</li>
+                            </ul>
+                            <div class="mt-3">
+                                <a href="{% url 'login' %}" class="btn btn-primary me-2">
+                                    <i class="fas fa-sign-in-alt me-1"></i>Login
+                                </a>
+                                <a href="{% url 'register' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-user-plus me-1"></i>Create Account
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card form-card">
+                    <div class="card-body p-5">
+                        <!-- Error message display (Django template syntax) -->
+                        {% if error %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            {{ error }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endif %}
+
+                        <form method="POST" action="{% url 'handle_prediction' %}" id="assessmentForm">
+                            {% csrf_token %}
+
+                            <!-- Hidden field to store converted glucose value -->
+                            <input type="hidden" name="blood_glucose_level" id="blood_glucose_level">
+
+                            <!-- Personal Information -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label">Gender</label>
+                                    <select class="form-select" name="gender" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                        <option value="">Select Gender</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        Age (years)
+                                        <i class="fas fa-info-circle info-tooltip" title="Enter your current age"></i>
+                                    </label>
+                                    <input type="number" class="form-control" name="age" min="1" max="120" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                </div>
+                            </div>
+
+                            <!-- Health Conditions -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        Hypertension
+                                        <i class="fas fa-info-circle info-tooltip" title="Do you have high blood pressure?"></i>
+                                    </label>
+                                    <select class="form-select" name="hypertension" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                        <option value="0">No</option>
+                                        <option value="1">Yes</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        Heart Disease
+                                        <i class="fas fa-info-circle info-tooltip" title="Do you have any heart conditions?"></i>
+                                    </label>
+                                    <select class="form-select" name="heart_disease" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                        <option value="0">No</option>
+                                        <option value="1">Yes</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Lifestyle Factors -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        Smoking History
+                                        <i class="fas fa-info-circle info-tooltip" title="Select your smoking status"></i>
+                                    </label>
+                                    <select class="form-select" name="smoking_history" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                        <option value="">Select Smoking Status</option>
+                                        <option value="never">Never smoked</option>
+                                        <option value="former">Former smoker</option>
+                                        <option value="current">Current smoker</option>
+                                        <option value="not_current">Not current smoker</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        BMI (Body Mass Index)
+                                        <i class="fas fa-info-circle info-tooltip" title="Weight in kg / (height in m)²"></i>
+                                    </label>
+                                    <input type="number" class="form-control" name="bmi" min="10" max="60" step="0.1" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                    <small class="text-muted">Normal range: 18.5 - 24.9</small>
+                                </div>
+                            </div>
+
+                            <!-- Glucose Level -->
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    Blood Glucose Level (mmol/L)
+                                    <i class="fas fa-info-circle info-tooltip" title="Fasting blood sugar level"></i>
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="blood_glucose_mmol" min="2" max="30" step="0.1" {% if not user.is_authenticated %}disabled{% endif %} required>
+                                    <span class="input-group-text">mmol/L</span>
+                                </div>
+                                <small class="text-muted">Normal fasting level: 3.9 - 5.6 mmol/L</small>
+                                <div class="mt-2">
+                                    <span class="unit-toggle" id="unitToggle" {% if not user.is_authenticated %}style="pointer-events: none; opacity: 0.5;"{% endif %}>
+                                        Switch to mg/dL
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="text-center">
+                                {% if user.is_authenticated %}
+                                <button type="submit" class="btn btn-assessment btn-lg">
+                                    <i class="fas fa-calculator me-2"></i>
+                                    Calculate My Risk
+                                </button>
+                                {% else %}
+                                <button type="button" class="btn btn-secondary btn-lg" disabled>
+                                    <i class="fas fa-lock me-2"></i>
+                                    Login Required to Assess
+                                </button>
+                                {% endif %}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Information Section -->
+                <div class="card form-card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-info-circle me-2"></i>About This Assessment</h5>
+                        <p class="card-text">
+                            This assessment uses a machine learning model trained on thousands of cases to predict
+                            diabetes risk based on your health metrics.
+                        </p>
+                        <p class="card-text">
+                            <strong>Note:</strong> After analysis always consult with healthcare professionals for medical advice.
+                        </p>
+                        <p class="card-text">
+                            <strong>Account Requirement:</strong> To protect your health data privacy and allow you to track your results over time, you must be logged in to use this assessment tool.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p>&copy; 2025 Diabetes Diagnostic System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Add tooltip functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('.info-tooltip'))
+            var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+
+            // Set up unit toggle
+            const unitToggle = document.getElementById('unitToggle');
+            const glucoseInput = document.getElementById('blood_glucose_mmol');
+            let usingMmol = true;
+
+            // Only set up unit toggle if user is authenticated
+            {% if user.is_authenticated %}
+            unitToggle.addEventListener('click', function() {
+                if (usingMmol) {
+                    // Convert to mg/dL
+                    const mmolValue = parseFloat(glucoseInput.value);
+                    if (!isNaN(mmolValue)) {
+                        glucoseInput.value = (mmolValue * 18.0182).toFixed(1);
+                    }
+                    glucoseInput.step = "1";
+                    glucoseInput.min = "36";
+                    glucoseInput.max = "540";
+                    unitToggle.textContent = "Switch to mmol/L";
+                    document.querySelector('.form-label').innerHTML = 'Blood Glucose Level (mg/dL) <i class="fas fa-info-circle info-tooltip" title="Fasting blood sugar level"></i>';
+                    document.querySelector('.text-muted').textContent = 'Normal fasting level: 70-100 mg/dL';
+                    document.querySelector('.input-group-text').textContent = 'mg/dL';
+                } else {
+                    // Convert to mmol/L
+                    const mgValue = parseFloat(glucoseInput.value);
+                    if (!isNaN(mgValue)) {
+                        glucoseInput.value = (mgValue / 18.0182).toFixed(1);
+                    }
+                    glucoseInput.step = "0.1";
+                    glucoseInput.min = "2";
+                    glucoseInput.max = "30";
+                    unitToggle.textContent = "Switch to mg/dL";
+                    document.querySelector('.form-label').innerHTML = 'Blood Glucose Level (mmol/L) <i class="fas fa-info-circle info-tooltip" title="Fasting blood sugar level"></i>';
+                    document.querySelector('.text-muted').textContent = 'Normal fasting level: 3.9-5.6 mmol/L';
+                    document.querySelector('.input-group-text').textContent = 'mmol/L';
+                }
+                usingMmol = !usingMmol;
+            });
+            {% endif %}
+
+            // Form submission handler
+            document.getElementById('assessmentForm').addEventListener('submit', function(e) {
+                // Only validate if user is authenticated
+                {% if user.is_authenticated %}
+                // Convert glucose value to mg/dL before submission
+                const glucoseInput = document.getElementById('blood_glucose_mmol');
+                const hiddenInput = document.getElementById('blood_glucose_level');
+
+                let glucoseValue = parseFloat(glucoseInput.value);
+                if (!isNaN(glucoseValue)) {
+                    if (usingMmol) {
+                        // Convert from mmol/L to mg/dL
+                        hiddenInput.value = (glucoseValue * 18.0182).toFixed(1);
+                    } else {
+                        // Already in mg/dL
+                        hiddenInput.value = glucoseValue;
+                    }
+                }
+
+                // Additional validation
+                const age = document.querySelector('input[name="age"]').value;
+                const bmi = document.querySelector('input[name="bmi"]').value;
+
+                if (age < 1 || age > 120) {
+                    e.preventDefault();
+                    alert("Please enter a valid age between 1 and 120");
+                    return false;
+                }
+
+                if (bmi < 10 || bmi > 60) {
+                    e.preventDefault();
+                    alert("Please enter a valid BMI between 10 and 60");
+                    return false;
+                }
+
+                if (usingMmol) {
+                    if (glucoseValue < 2 || glucoseValue > 30) {
+                        e.preventDefault();
+                        alert("Please enter a valid glucose level between 2 and 30 mmol/L");
+                        return false;
+                    }
+                } else {
+                    if (glucoseValue < 36 || glucoseValue > 540) {
+                        e.preventDefault();
+                        alert("Please enter a valid glucose level between 36 and 540 mg/dL");
+                        return false;
+                    }
+                }
+                {% else %}
+                // Prevent form submission if not authenticated
+                e.preventDefault();
+                alert("You must be logged in to submit this form. Please login or create an account.");
+                window.location.href = "{% url 'login' %}";
+                return false;
+                {% endif %}
+
+                return true;
+            });
+        });
+    </script>
+</body>
+</html>

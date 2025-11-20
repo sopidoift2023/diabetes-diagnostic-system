@@ -1,0 +1,1 @@
+default_app_config = 'diabetes_app.apps.DiabetesAppConfig'

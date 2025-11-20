@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - Diabetes Diagnostic System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.85) !important;
+            padding: 0.5rem 1rem;
+        }
+        .navbar-nav .nav-link:hover {
+            color: white !important;
+        }
+        .navbar-text {
+            color: rgba(255, 255, 255, 0.85);
+        }
+        .logout-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.85) !important;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+        }
+        .logout-btn:hover {
+            color: white !important;
+        }
+        .results-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+        }
+        .result-card {
+            border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 15px;
+        }
+        .risk-low {
+            color: #28a745;
+        }
+        .risk-medium {
+            color: #ffc107;
+        }
+        .risk-high {
+            color: #dc3545;
+        }
+        .probability-bar {
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .btn-new-assessment {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+            margin: 20px 0;
+        }
+        .recommendation-section {
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+            margin: 20px 0;
+        }
+        .interpretation-box {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'index' %}">
+                <i class="fas fa-heartbeat me-2"></i>
+                DiabetesDiagnostic
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                    <span class="navbar-text me-3">
+                        <i class="fas fa-user me-1"></i>Welcome, {{ user.username }}
+                    </span>
+                    <a class="nav-link" href="{% url 'index' %}">
+                        <i class="fas fa-home me-1"></i>Home
+                    </a>
+                    <a class="nav-link" href="{% url 'history' %}">
+                        <i class="fas fa-history me-1"></i>My History
+                    </a>
+                    <!-- Fixed Logout Form -->
+                    <form action="{% url 'logout' %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="logout-btn nav-link">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                        </button>
+                    </form>
+                    {% else %}
+                    <a class="nav-link" href="{% url 'login' %}">
+                        <i class="fas fa-sign-in-alt me-1"></i>Login
+                    </a>
+                    <a class="nav-link" href="{% url 'register' %}">
+                        <i class="fas fa-user-plus me-1"></i>Register
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <div class="results-header text-center">
+        <div class="container">
+            <h1 class="display-5 fw-bold">Assessment Results</h1>
+            <p class="lead">Your personalized diabetes risk assessment</p>
+        </div>
+    </div>
+
+    <!-- Results Content -->
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card result-card">
+                    <div class="card-body p-5">
+                        <!-- Risk Summary -->
+                        <div class="text-center mb-4">
+                            {% if prediction.diabetes_prediction == 1 %}
+                            <div class="risk-high">
+                                <i class="fas fa-exclamation-triangle fa-5x mb-4"></i>
+                                <h2 class="fw-bold">Higher Risk Detected</h2>
+                                <p class="lead">Based on your inputs, there's an increased risk of diabetes</p>
+                            </div>
+                            {% else %}
+                            <div class="risk-low">
+                                <i class="fas fa-check-circle fa-5x mb-4"></i>
+                                <h2 class="fw-bold">Lower Risk Detected</h2>
+                                <p class="lead">Based on your inputs, the risk of diabetes appears lower</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Risk Chart -->
+                        <div class="chart-container">
+                            <canvas id="riskChart"></canvas>
+                        </div>
+
+                        <!-- Probability Visualization -->
+                        <div class="my-5">
+                            <h4 class="mb-3">Risk Probability Breakdown</h4>
+                            <div class="progress probability-bar mb-2">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                     style="width: {{ prediction.probability_no_diabetes|floatformat:2 }}%"
+                                     aria-valuenow="{{ prediction.probability_no_diabetes|floatformat:2 }}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    No Diabetes: {{ prediction.probability_no_diabetes|floatformat:2 }}%
+                                </div>
+                            </div>
+                            <div class="progress probability-bar">
+                                <div class="progress-bar bg-danger" role="progressbar"
+                                     style="width: {{ prediction.probability_diabetes|floatformat:2 }}%"
+                                     aria-valuenow="{{ prediction.probability_diabetes|floatformat:2 }}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    Diabetes: {{ prediction.probability_diabetes|floatformat:2 }}%
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Clear Probability Display -->
+                        <div class="alert
+                            {% if prediction.diabetes_prediction == 1 %}
+                                {% if prediction.probability_diabetes >= 80 %}alert-danger
+                                {% elif prediction.probability_diabetes >= 60 %}alert-warning
+                                {% else %}alert-info{% endif %}
+                            {% else %}
+                                {% if prediction.probability_no_diabetes >= 80 %}alert-success
+                                {% elif prediction.probability_no_diabetes >= 60 %}alert-info
+                                {% else %}alert-warning{% endif %}
+                            {% endif %}">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            <strong>Probability Estimate:</strong>
+                            {% if prediction.diabetes_prediction == 1 %}
+                                {{ prediction.probability_diabetes|floatformat:1 }}% chance of diabetes
+                            {% else %}
+                                {{ prediction.probability_no_diabetes|floatformat:1 }}% chance of being diabetes-free
+                            {% endif %}
+                        </div>
+
+                        <!-- NEW: Interpretation Section -->
+                        <div class="interpretation-box">
+                            <h5><i class="fas fa-binoculars me-2"></i>Interpretation</h5>
+                            <p>
+                                {% if prediction.diabetes_prediction == 1 %}
+                                    This {{ prediction.probability_diabetes|floatformat:1 }}% probability indicates
+                                    {% if prediction.probability_diabetes >= 80 %}
+                                        a high likelihood of diabetes based on your health profile.
+                                    {% elif prediction.probability_diabetes >= 60 %}
+                                        a moderate likelihood of diabetes based on your health profile.
+                                    {% else %}
+                                        a slightly elevated likelihood of diabetes compared to average.
+                                    {% endif %}
+                                {% else %}
+                                    This {{ prediction.probability_no_diabetes|floatformat:1 }}% probability indicates
+                                    {% if prediction.probability_no_diabetes >= 80 %}
+                                        a high likelihood of being diabetes-free based on your health profile.
+                                    {% elif prediction.probability_no_diabetes >= 60 %}
+                                        a moderate likelihood of being diabetes-free based on your health profile.
+                                    {% else %}
+                                        a slightly reduced likelihood of diabetes compared to average.
+                                    {% endif %}
+                                {% endif %}
+                                This estimate is based on machine learning analysis of factors like age, BMI, glucose levels, and medical history.
+                            </p>
+                        </div>
+
+                        <!-- Confidence Level (Updated Label) -->
+                        <div class="alert
+                            {% if prediction.confidence >= 80 %}alert-success
+                            {% elif prediction.confidence >= 60 %}alert-info
+                            {% else %}alert-warning{% endif %}">
+                            <i class="fas fa-chart-line me-2"></i>
+                            <strong>Model Confidence:</strong> {{ prediction.confidence|floatformat:1 }}%
+                            <span class="ms-2">
+                                {% if prediction.confidence >= 80 %}(High Confidence)
+                                {% elif prediction.confidence >= 60 %}(Moderate Confidence)
+                                {% else %}(Low Confidence){% endif %}
+                            </span>
+                        </div>
+
+                        <!-- Recommendations based on confidence -->
+                        <div class="mt-4">
+                            <h4><i class="fas fa-lightbulb me-2"></i>Recommendations</h4>
+
+                            <!-- Confidence-based recommendations -->
+                            <div class="recommendation-section">
+                                {% if prediction.confidence >= 80 %}
+                                <div class="alert alert-success">
+                                    <h5><i class="fas fa-star me-2"></i>High Confidence Result</h5>
+                                    <p>Our algorithm is highly confident in this assessment. You should:</p>
+                                    <ul>
+                                        <li>Follow the recommendations below based on your risk level</li>
+                                        <li>Share these results with your healthcare provider</li>
+                                        <li>Consider this a reliable indicator for preventive actions</li>
+                                    </ul>
+                                </div>
+                                {% elif prediction.confidence >= 60 %}
+                                <div class="alert alert-info">
+                                    <h5><i class="fas fa-info-circle me-2"></i>Moderate Confidence Result</h5>
+                                    <p>Our algorithm is moderately confident in this assessment. You should:</p>
+                                    <ul>
+                                        <li>Consider these results as a general guideline</li>
+                                        <li>Consult with a healthcare professional for confirmation</li>
+                                        <li>Monitor your health indicators regularly</li>
+                                    </ul>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-warning">
+                                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Low Confidence Result</h5>
+                                    <p>Our algorithm has lower confidence in this assessment. You should:</p>
+                                    <ul>
+                                        <li>Consult with a healthcare professional for accurate assessment</li>
+                                        <li>Consider retaking the assessment with more precise information</li>
+                                        <li>Use this result only as a preliminary indication</li>
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Risk-based recommendations -->
+                            <div class="recommendation-section">
+                                {% if prediction.diabetes_prediction == 1 %}
+                                <div class="alert alert-warning">
+                                    <h5><i class="fas fa-heartbeat me-2"></i>For Your Higher Risk Assessment</h5>
+                                    <p>Based on your results, we recommend:</p>
+                                    <ul>
+                                        <li>Consult with a healthcare professional for further evaluation</li>
+                                        <li>Maintain a healthy diet low in sugar and refined carbohydrates</li>
+                                        <li>Engage in regular physical activity (at least 150 minutes per week)</li>
+                                        <li>Monitor your blood glucose levels regularly</li>
+                                        <li>Schedule regular check-ups with your doctor</li>
+                                        <li>Maintain a healthy weight</li>
+                                        <li>Reduce stress through meditation or other relaxation techniques</li>
+                                    </ul>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-success">
+                                    <h5><i class="fas fa-heart me-2"></i>For Your Lower Risk Assessment</h5>
+                                    <p>Great job maintaining healthy habits! Continue with:</p>
+                                    <ul>
+                                        <li>Balanced diet rich in fruits, vegetables, and whole grains</li>
+                                        <li>Regular exercise (at least 30 minutes most days)</li>
+                                        <li>Annual health check-ups including blood sugar tests</li>
+                                        <li>Maintaining healthy weight</li>
+                                        <li>Limited alcohol consumption and avoiding tobacco</li>
+                                        <li>Regular sleep patterns (7-9 hours per night)</li>
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Next Steps -->
+                        <div class="mt-4">
+                            <h4><i class="fas fa-road me-2"></i>Next Steps</h4>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h5><i class="fas fa-user-md me-2"></i>Medical Consultation</h5>
+                                            <p>Schedule an appointment with your healthcare provider to discuss these results and develop a personalized health plan.</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h5><i class="fas fa-calendar-check me-2"></i>Follow-up Assessment</h5>
+                                            <p>Consider retaking this assessment in 3-6 months to track changes in your risk factors over time.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="mt-4 text-center">
+                            <a href="/predict/" class="btn btn-new-assessment me-3">
+                                <i class="fas fa-redo me-2"></i>
+                                New Assessment
+                            </a>
+                            <a href="/" class="btn btn-outline-secondary">
+                                <i class="fas fa-home me-2"></i>
+                                Back to Home
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disclaimer -->
+                <div class="card result-card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-exclamation-triangle me-2"></i>Important Disclaimer</h5>
+                        <p class="card-text small">
+                            This assessment is based on a machine learning model and provides predictive insights only.
+                            Always seek the advice of qualified healthcare providers with any questions you may have
+                            regarding medical conditions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p>&copy; 2025 Diabetes Diagnostic System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the probability values from the template variables
+            const noDiabetesProb = parseFloat("{{ prediction.probability_no_diabetes|floatformat:2 }}");
+            const diabetesProb = parseFloat("{{ prediction.probability_diabetes|floatformat:2 }}");
+            const confidence = parseFloat("{{ prediction.confidence|floatformat:1 }}");
+
+            // Create risk chart
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            const riskChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['No Diabetes', 'Diabetes Risk'],
+                    datasets: [{
+                        data: [noDiabetesProb, diabetesProb],
+                        backgroundColor: [
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(220, 53, 69, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw}%`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    }
+                }
+            });
+
+            // Add confidence indicator to chart
+            Chart.register({
+                id: 'confidenceIndicator',
+                afterDraw: function(chart) {
+                    if (chart.config.type === 'doughnut') {
+                        const ctx = chart.ctx;
+                        const chartArea = chart.chartArea;
+                        const centerX = (chartArea.left + chartArea.right) / 2;
+                        const centerY = (chartArea.top + chartArea.bottom) / 2;
+
+                        ctx.save();
+                        ctx.font = 'bold 16px Arial';
+                        ctx.fillStyle = '#333';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(`Confidence: ${confidence}%`, centerX, centerY);
+                        ctx.restore();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
