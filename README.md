@@ -178,8 +178,7 @@ Visit: http://localhost:8000
 *Federal University of Technology, Owerri*  
 -  Email: orieremmanuel@gmail.com  
 -  GitHub: [sopidoift2023](https://github.com/sopidoift2023)  
-- Live Demo: [Diabetes Diagnostic System](https://oriereenmanuel.pythonanywhere.com)
-
+- Live Demo: https://oriereemmanuel.pythonanywhere.com/
 ##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
